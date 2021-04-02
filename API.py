@@ -223,7 +223,7 @@ def get_user_achievements(u_id):
       200:
         description: All achievements
     """
-    achievements_db = query_db('SELECT * FROM users_achievements NATURAL JOIN achievements WHERE u_id = ?', [u_id])
+    achievements_db = query_db('SELECT a_id, title, description FROM users_achievements NATURAL JOIN achievements WHERE u_id = ?', [u_id])
     achievements = []
 
     for achievement in achievements_db :
