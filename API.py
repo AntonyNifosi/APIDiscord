@@ -3,8 +3,10 @@ import sqlite3
 import random
 
 from flask import g, jsonify, request
+from flasgger import Swagger
 
 app = flask.Flask(__name__)
+swagger = Swagger(app)
 
 random.seed(15)
 DATABASE = 'database/database.db'
@@ -14,6 +16,12 @@ def get_db():
     if db is None:
         db = g._database = sqlite3.connect(DATABASE)
     return db
+
+def update_db(query, args=()):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute(query, args)
+    db.commit()
 
 def query_db(query, args=(), one=False):
     cur = get_db().execute(query, args)
@@ -27,15 +35,25 @@ def close_connection(exception):
     if db is not None:
         db.close()
 
-@app.route('/', methods=['GET'])
-def home():
-    return "<h1>Distant Reading Archive</h1><p>This site is a prototype API for distant reading of science fiction novels.</p>"
-
 @app.route('/wordpair', methods=['GET'])
 def get_word_pair():
-    total = query_db('SELECT COUNT(*) as COUNT FROM word_pair', one=True)
+    """Return a random WordPair from the database
+    ---
+    responses:
+      200:
+        description: A pair of words
+        schema:
+            type: object
+            properties:
+                bystander_word:
+                    type: string
+                undercover_word:
+                    type: string
+        examples:
+    """
+    total = query_db('SELECT COUNT(*) as COUNT FROM word_pairs', one=True)
 
-    pair_db = query_db('SELECT bystander_word, undercover_word FROM word_pair WHERE id = ?', [random.randint(1, total[0])], one=True)
+    pair_db = query_db('SELECT bystander_word, undercover_word FROM word_pairs WHERE id = ?', [random.randint(1, total[0])], one=True)
 
     pair = {
         'bystander_word':pair_db[0],
@@ -43,17 +61,81 @@ def get_word_pair():
     }
     return jsonify(pair)
 
+@app.route('/user', methods=['GET'])
+def get_users():
+    """Return all users
+    ---
+    responses:
+      200:
+        description: A pair of words
+        schema:
+        examples:
+    """
+    pair_db = query_db('SELECT * FROM users', one=False)
+
+    return jsonify(pair_db)
+
+
 @app.route('/user/', methods=['POST'])
 def add_user():
-    query_db('INSERT INTO user (u_id, username) VALUES  (?, ?)', [request.form['u_id'], request.form['username']])
+    """
+    Post a new user
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          required:
+            - u_id
+            - username
+          properties:
+            u_id:
+              type: string
+              example: "208662022160777216"
+            username:
+              type: string
+              description: The user username in Discord
+              example: "kekun#2126"
+    responses:
+      200:
+        description: The product inserted in the database
+        schema:
+    """
+    user = {
+        'u_id':request.json['u_id'], 
+        'username':request.json['username']
+    } 
 
-@app.route('/user/<int:u_id>', methods=['DELETE'])
-def add_user(u_id):
-    query_db('DELETE FROM user WHERE u_id = ?', ['u_id'])
+    update_db('INSERT INTO users (u_id, username) VALUES  (?, ?)', [user['u_id'], user['username']])
 
-@app.route('/user/<int:u_id>', methods=['GET'])
+    return user
+
+@app.route('/user/<string:u_id>', methods=['DELETE'])
+def delete_user(u_id):
+    """
+    Delete a user
+    ---
+    parameters:
+      - in: path
+        name: u_id
+        required: true
+        schema:
+            type: string
+            example: "208662022160777216"
+        required: true
+        description: The tool id
+    responses:
+      200:
+        description: User deleted
+    """
+    update_db('DELETE FROM users WHERE u_id = ?', ['u_id'])
+    
+    return "user deleted"
+
+@app.route('/user/<string:u_id>', methods=['GET'])
 def get_user(u_id):
-    user_db = query_db('SELECT * FROM user WHERE u_id = ?', [u_id], one=True)
+    user_db = query_db('SELECT * FROM users WHERE u_id = ?', [u_id], one=True)
 
     user = {
         'u_id':user_db[0],
@@ -64,13 +146,13 @@ def get_user(u_id):
 
     return jsonify(user)
 
-@app.route('/user/<int:u_id>/achievements/', methods=['POST'])
+@app.route('/user/<string:u_id>/achievements/', methods=['POST'])
 def give_achievement(u_id):
-    query_db('INSERT INTO user_achievement (u_id, a_id) VALUES (?, ?)', [u_id, request.form['a_id']])
+    update_db('INSERT INTO user_achievements (u_id, a_id) VALUES (?, ?)', [u_id, request.form['a_id']])
 
-@app.route('/user/<int:u_id>/achievements', methods=['GET'])
+@app.route('/user/<string:u_id>/achievements', methods=['GET'])
 def get_user_achievements(u_id):
-    achievements_db = query_db('SELECT * FROM user_achievement NATURAL JOIN achievement WHERE u_id = ?', [u_id])
+    achievements_db = query_db('SELECT * FROM user_achievements NATURAL JOIN achievement WHERE u_id = ?', [u_id])
     achievements = []
 
     for achievement in achievements_db :
@@ -86,7 +168,7 @@ def get_user_achievements(u_id):
 
 @app.route('/achievements', methods=['GET'])
 def get_achievements():
-    achievements_db = query_db('SELECT * FROM achievement')
+    achievements_db = query_db('SELECT * FROM achievements')
 
     achievements = []
 
@@ -101,9 +183,9 @@ def get_achievements():
 
     return jsonify(achievements)
 
-@app.route('/user/<int:u_id>/win', methods=['PUT'])
+@app.route('/user/<string:u_id>/win', methods=['PUT'])
 def add_win(u_id):
-    query_db('UPDATE user SET ? = (? + 1) WHERE u_id = ? ', request.form['win'] [u_id])
+    query_db('UPDATE users SET ? = (? + 1) WHERE u_id = ? ', request.form['win'] [u_id])
 
 app.config["DEBUG"] = True
 app.run()
