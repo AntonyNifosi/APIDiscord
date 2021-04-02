@@ -24,6 +24,7 @@ def update_db(query, args=()):
     db.commit()
 
 def query_db(query, args=(), one=False):
+    print(query)
     cur = get_db().execute(query, args)
     rv = cur.fetchall()
     cur.close()
@@ -49,7 +50,6 @@ def get_word_pair():
                     type: string
                 undercover_word:
                     type: string
-        examples:
     """
     total = query_db('SELECT COUNT(*) as COUNT FROM word_pairs', one=True)
 
@@ -67,11 +67,32 @@ def get_users():
     ---
     responses:
       200:
-        description: A pair of words
+        description: All users
         schema:
         examples:
     """
     pair_db = query_db('SELECT * FROM users', one=False)
+
+    return jsonify(pair_db)
+
+@app.route('/ranking/<string:ranking_type>', methods=['GET'])
+def get_rankings(ranking_type):
+    """Return the ranking of the users
+    ---
+    parameters:
+      - in: path
+        name: ranking_type
+        required: true
+        schema:
+            type: string
+            example: "bystander_victory"
+        required: true
+        description: Type of ranking wanted
+    responses:
+      200:
+        description: All users
+    """
+    pair_db = query_db('SELECT * FROM users ORDER BY ' + ranking_type + ' DESC', one=False)
 
     return jsonify(pair_db)
 
@@ -99,7 +120,7 @@ def add_user():
               example: "kekun#2126"
     responses:
       200:
-        description: The product inserted in the database
+        description: User successfully added
         schema:
     """
     user = {
@@ -111,10 +132,10 @@ def add_user():
 
     return user
 
-@app.route('/user/<string:u_id>', methods=['DELETE'])
-def delete_user(u_id):
+@app.route('/user/<string:u_id>', methods=['GET'])
+def get_user(u_id):
     """
-    Delete a user
+    Get the user ith the specified id
     ---
     parameters:
       - in: path
@@ -124,17 +145,23 @@ def delete_user(u_id):
             type: string
             example: "208662022160777216"
         required: true
-        description: The tool id
+        description: User id
     responses:
       200:
-        description: User deleted
+        description: A user
+        schema:
+            type: object
+            properties:
+                u_id:
+                    type: string
+                username:
+                    type: string
+                bystander_victory:
+                    type: number
+                undercover_victory:
+                    type: number
     """
-    update_db('DELETE FROM users WHERE u_id = ?', ['u_id'])
-    
-    return "user deleted"
-
-@app.route('/user/<string:u_id>', methods=['GET'])
-def get_user(u_id):
+    print(u_id)
     user_db = query_db('SELECT * FROM users WHERE u_id = ?', [u_id], one=True)
 
     user = {
@@ -148,11 +175,55 @@ def get_user(u_id):
 
 @app.route('/user/<string:u_id>/achievements/', methods=['POST'])
 def give_achievement(u_id):
-    update_db('INSERT INTO user_achievements (u_id, a_id) VALUES (?, ?)', [u_id, request.form['a_id']])
+    """
+    Grant an achievement to the specified user
+    ---
+    parameters:
+      - in: path
+        name: u_id
+        required: true
+        schema:
+            type: string
+            example: "208662022160777216"
+        required: true
+        description: User
+      - name: body
+        in: body
+        required: true
+        schema:
+          required:
+            - a_id
+          properties:
+            a_id:
+              type: number
+              description: Achievement_id
+              example: 1
+    responses:
+      200:
+        description: Achievement successfully added
+    """
+    update_db('INSERT INTO users_achievements (u_id, a_id) VALUES (?, ?)', [u_id, request.json['a_id']])
+
+    return "Sucess"
 
 @app.route('/user/<string:u_id>/achievements', methods=['GET'])
 def get_user_achievements(u_id):
-    achievements_db = query_db('SELECT * FROM user_achievements NATURAL JOIN achievement WHERE u_id = ?', [u_id])
+    """Return all achievements of a user
+    ---
+    parameters:
+      - in: path
+        name: u_id
+        required: true
+        schema:
+            type: string
+            example: "208662022160777216"
+        required: true
+        description: User id 
+    responses:
+      200:
+        description: All achievements
+    """
+    achievements_db = query_db('SELECT * FROM users_achievements NATURAL JOIN achievements WHERE u_id = ?', [u_id])
     achievements = []
 
     for achievement in achievements_db :
@@ -168,6 +239,12 @@ def get_user_achievements(u_id):
 
 @app.route('/achievements', methods=['GET'])
 def get_achievements():
+    """Return all achievements 
+    ---
+    responses:
+      200:
+        description: All achievements
+    """
     achievements_db = query_db('SELECT * FROM achievements')
 
     achievements = []
@@ -185,7 +262,38 @@ def get_achievements():
 
 @app.route('/user/<string:u_id>/win', methods=['PUT'])
 def add_win(u_id):
-    query_db('UPDATE users SET ? = (? + 1) WHERE u_id = ? ', request.form['win'] [u_id])
+    """
+    Grant a win to the specified user
+    ---
+    parameters:
+      - in: path
+        name: u_id
+        required: true
+        schema:
+            type: string
+            example: "208662022160777216"
+        required: true
+        description: User id 
+      - name: body
+        in: body
+        required: true
+        schema:
+          required:
+            - win_type
+          properties:
+            win_type:
+              type: string
+              description: Achievement_id
+              example: undercover_victory
+    responses:
+      200:
+        description: Victory successfully added
+    """
+    win_type = request.json['win_type']
+    actual = query_db('SELECT ' + win_type + ' FROM users WHERE u_id = ?',  [u_id], one=True)
+    update_db('UPDATE users SET ' + win_type + ' = ? + 1 WHERE u_id = ? ', [actual[0], u_id])
+
+    return "Success"
 
 app.config["DEBUG"] = True
 app.run()
