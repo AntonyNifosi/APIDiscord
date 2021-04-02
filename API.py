@@ -45,7 +45,7 @@ def get_word_pair():
 
 @app.route('/user/', methods=['POST'])
 def add_user():
-    query_db('INSERT INTO user (bystander_word, undercover_word) VALUES (?, ?)', [request.form['u_id'], request.form['username']])
+    query_db('INSERT INTO user (u_id, username) VALUES  (?, ?)', [request.form['u_id'], request.form['username']])
 
 @app.route('/user/<int:u_id>', methods=['GET'])
 def get_user(u_id):
@@ -96,6 +96,10 @@ def get_achievements():
         )
 
     return jsonify(achievements)
+
+@app.route('/user/<int:u_id>/win', methods=['PUT'])
+def add_win(u_id):
+    query_db('UPDATE user SET ? = (? + 1) WHERE u_id = ? ', request.form['win'] [u_id])
 
 app.config["DEBUG"] = True
 app.run()
