@@ -3,7 +3,6 @@ import sqlite3
 import random
 
 from flask import g, jsonify, request
-from flask_swagger import swagger
 
 app = flask.Flask(__name__)
 
@@ -105,10 +104,6 @@ def get_achievements():
 @app.route('/user/<int:u_id>/win', methods=['PUT'])
 def add_win(u_id):
     query_db('UPDATE user SET ? = (? + 1) WHERE u_id = ? ', request.form['win'] [u_id])
-
-@app.route("/spec")
-def spec():
-    return jsonify(swagger(app))
 
 app.config["DEBUG"] = True
 app.run()
